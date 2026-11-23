@@ -7,9 +7,11 @@ import time
 
 import redis
 from dotenv import load_dotenv
+import psycopg
 
 from detector import Detector
 from notifier import DiscordNotifier
+from persistence import PostgreSQLPersistence
 
 
 def main():
@@ -31,6 +33,7 @@ def main():
         notifier = DiscordNotifier(webhook)
 
     detector = Detector()
+    persistence = PostgreSQLPersistence()
     print(f"[ANALYZER] Escuchando '{channel}' en {host}:{port} "
           f"({'dry-run' if args.dry_run else 'Discord activo'})")
 
@@ -44,9 +47,17 @@ def main():
                     event = json.loads(msg["data"])
                 except (json.JSONDecodeError, TypeError):
                     continue
+                try:
+                    persistence.record_event(event)
+                except psycopg.Error as exc:
+                    print(f"[POSTGRES] Error al guardar el evento: {exc}", flush=True)
                 for alert in detector.analyze(event):
                     print(f"[ALERTA {alert.severity}] {alert.title} | "
                           f"{alert.src_ip} -> {alert.dst_ip}:{alert.dst_port}")
+                    try:
+                        persistence.record_alert(alert)
+                    except psycopg.Error as exc:
+                        print(f"[POSTGRES] Error al guardar la alerta: {exc}", flush=True)
                     if notifier:
                         notifier.send(alert)
         except redis.ConnectionError:
