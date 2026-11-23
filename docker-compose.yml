@@ -4,7 +4,6 @@ services:
     image: omniguard-analyzer:latest
     container_name: omniguard-analyzer
     restart: unless-stopped
-    command: ["--dry-run"]  # o configurable por variable de entorno
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
