@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import psycopg
 
 from detector import Detector
-from notifier import DiscordNotifier
+from notifier import CoreBackendNotifier, DiscordNotifier
 from persistence import PostgreSQLPersistence
 
 
@@ -25,12 +25,20 @@ def main():
     port = int(os.getenv("REDIS_PORT", "6379"))
     channel = os.getenv("REDIS_CHANNEL", "network_events")
     webhook = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+    core_api_url = os.getenv("CORE_API_URL", "").strip()
+    internal_token = os.getenv("INTERNAL_API_TOKEN", "").strip()
 
-    notifier = None
+    discord_notifier = None
     if not args.dry_run:
         if not webhook:
-            sys.exit("Falta DISCORD_WEBHOOK_URL en .env (o usa --dry-run).")
-        notifier = DiscordNotifier(webhook)
+            print("[ANALYZER] DISCORD_WEBHOOK_URL no configurado; notificaciones Discord desactivadas.", flush=True)
+        else:
+            discord_notifier = DiscordNotifier(webhook)
+
+    core_notifier = None
+    if core_api_url:
+        core_notifier = CoreBackendNotifier(core_api_url, internal_token)
+        print(f"[ANALYZER] Integración Core API activa hacia {core_api_url}", flush=True)
 
     detector = Detector()
     persistence = PostgreSQLPersistence()
@@ -58,8 +66,14 @@ def main():
                         persistence.record_alert(alert)
                     except psycopg.Error as exc:
                         print(f"[POSTGRES] Error al guardar la alerta: {exc}", flush=True)
-                    if notifier:
-                        notifier.send(alert)
+                    if core_notifier:
+                        try:
+                            if core_notifier.send(alert):
+                                print(f"[CORE-API] Alerta despachada exitosamente al Backend Java", flush=True)
+                        except Exception as exc:
+                            print(f"[CORE-API] Error inesperado al enviar alerta: {exc}", flush=True)
+                    if discord_notifier:
+                        discord_notifier.send(alert)
         except redis.ConnectionError:
             print("[ANALYZER] Sin conexión a Redis, reintentando en 3 s...")
             time.sleep(3)

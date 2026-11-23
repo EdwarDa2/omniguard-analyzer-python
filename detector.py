@@ -24,6 +24,18 @@ class Alert:
     dst_port: int
     event: dict = field(default_factory=dict)
 
+    @property
+    def category(self) -> str:
+        return self.event.get("category", self.rule)
+
+    @property
+    def protocol(self) -> str:
+        return self.event.get("protocol", "TCP")
+
+    @property
+    def app_protocol(self) -> str:
+        return self.event.get("app_protocol", "Desconocido")
+
 
 class Detector:
     def __init__(self,

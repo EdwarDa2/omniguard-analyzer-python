@@ -1,0 +1,26 @@
+services:
+  analyzer:
+    build: .
+    image: omniguard-analyzer:latest
+    container_name: omniguard-analyzer
+    restart: unless-stopped
+    command: ["--dry-run"]  # o configurable por variable de entorno
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_CHANNEL: network_events
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: omniguard
+      POSTGRES_USER: omniguard
+      POSTGRES_PASSWORD: omniguard_dev_edwarda2
+      CORE_API_URL: http://omniguard-core:8080/api/v1
+      INTERNAL_API_TOKEN: omniguard_m2m_secret_token_dev_2026
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+    networks:
+      - omniguard-network
+
+networks:
+  omniguard-network:
+    name: omniguard-infra_omniguard
+    external: true
